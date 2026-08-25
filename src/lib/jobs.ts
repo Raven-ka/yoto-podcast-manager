@@ -60,7 +60,7 @@ async function tick(): Promise<void> {
     { id: string; type: JobType; payload_json: string; attempts: number; max_attempts: number }[]
   >(
     `SELECT id, type, payload_json, attempts, max_attempts FROM jobs
-     WHERE state='PENDING' AND next_run_at <= $1 ORDER BY next_run_at LIMIT 5`,
+     WHERE state='PENDING' AND next_run_at <= $1 ORDER BY next_run_at LIMIT 50`,
     [now()],
   );
   for (const job of rows) {
@@ -117,4 +117,19 @@ export async function startRunner(): Promise<void> {
 export function stopRunner(): void {
   if (timer) clearInterval(timer);
   timer = null;
+}
+
+export type JobSummary = { running: number; pending: number; failed: number };
+
+export async function getJobSummary(): Promise<JobSummary> {
+  const d = await getDb();
+  const rows = await d.select<{ state: string; n: number }[]>(
+    `SELECT state, COUNT(*) n FROM jobs WHERE state IN ('RUNNING','PENDING','FAILED') GROUP BY state`,
+  );
+  const byState = Object.fromEntries(rows.map((r) => [r.state, r.n]));
+  return {
+    running: byState.RUNNING ?? 0,
+    pending: byState.PENDING ?? 0,
+    failed: byState.FAILED ?? 0,
+  };
 }

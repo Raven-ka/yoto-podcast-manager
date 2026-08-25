@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getDb } from "../lib/db";
 import { enqueue } from "../lib/jobs";
+import { removeCard } from "../lib/pipeline";
 import { detectDirection } from "../lib/text";
 
 export default function Cards() {
@@ -21,6 +22,19 @@ export default function Cards() {
     const t = setInterval(refresh, 5000);
     return () => clearInterval(t);
   }, []);
+
+  async function handleRemove(c: any) {
+    if (
+      !confirm(
+        `Remove "${c.title}" from this app? This stops it from being synced here. ` +
+          `It does NOT delete the card content already on your Yoto account.`,
+      )
+    ) {
+      return;
+    }
+    await removeCard(c.id);
+    await refresh();
+  }
 
   const stateLabel: Record<string, string> = {
     IN_SYNC: "Up to date",
@@ -43,7 +57,12 @@ export default function Cards() {
             {stateLabel[c.sync_state] ?? c.sync_state} · {c.on_card} episode(s) on card
             {c.last_synced_at && ` · last updated ${new Date(c.last_synced_at).toLocaleString()}`}
           </p>
-          <button onClick={() => enqueue("sync-card", { cardId: c.id })}>Sync now</button>
+          <div className="row" style={{ marginTop: 10 }}>
+            <button onClick={() => enqueue("sync-card", { cardId: c.id })}>Sync now</button>
+            <button className="danger" onClick={() => handleRemove(c)}>
+              Remove
+            </button>
+          </div>
         </div>
       ))}
     </div>

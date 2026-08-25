@@ -7,8 +7,11 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::net::{IpAddr, ToSocketAddrs};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::io::AsyncWriteExt;
 use url::Url;
+
+static TMP_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 const MAX_REDIRECTS: usize = 5;
 const CONNECT_TIMEOUT_S: u64 = 20;
@@ -139,7 +142,8 @@ pub async fn download_file(
     tokio::fs::create_dir_all(&dir)
         .await
         .map_err(|e| format!("mkdir: {e} (E_FS)"))?;
-    let tmp = dir.join(format!(".part-{}", std::process::id()));
+    let n = TMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let tmp = dir.join(format!(".part-{}-{n}", std::process::id()));
     let mut file = tokio::fs::File::create(&tmp)
         .await
         .map_err(|e| format!("create: {e} (E_FS)"))?;

@@ -107,6 +107,14 @@ const MIGRATIONS: string[] = [
     detail_json TEXT
   );
   `,
+  // v2 — store Yoto's actual transcode result per episode (SPEC.md §5:
+  // card content must describe the transcoded file, not the RSS-reported one).
+  `
+  ALTER TABLE episodes ADD COLUMN transcoded_duration_seconds INTEGER;
+  ALTER TABLE episodes ADD COLUMN transcoded_file_size INTEGER;
+  ALTER TABLE episodes ADD COLUMN transcoded_channels INTEGER;
+  ALTER TABLE episodes ADD COLUMN transcoded_format TEXT;
+  `,
 ];
 
 export async function getDb(): Promise<Database> {

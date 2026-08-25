@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { getDb } from "../lib/db";
 import { isSignedIn, signIn } from "../lib/oauth";
+import { SignInIcon, PlusIcon } from "../components/icons";
 
 export default function Home() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [counts, setCounts] = useState({ podcasts: 0, jobs: 0, attention: 0 });
 
-  async function refresh() {
-    setSignedIn(await isSignedIn());
+  async function refreshCounts() {
     const d = await getDb();
     const [p] = await d.select<any[]>(`SELECT COUNT(*) n FROM podcasts`);
     const [j] = await d.select<any[]>(
@@ -20,8 +20,9 @@ export default function Home() {
   }
 
   useEffect(() => {
-    void refresh();
-    const t = setInterval(refresh, 5000);
+    void isSignedIn().then(setSignedIn);
+    void refreshCounts();
+    const t = setInterval(refreshCounts, 5000);
     return () => clearInterval(t);
   }, []);
 
@@ -29,24 +30,38 @@ export default function Home() {
     <div>
       <h2>Home</h2>
       {signedIn === false && (
-        <div className="card">
-          <strong>Connect your Yoto account</strong>
-          <p className="muted">
-            Sign in once — after that, cards update automatically. You can also
-            use export-only mode without signing in.
-          </p>
+        <div className="card card--row">
+          <div className="icon-circle icon-circle--accent">
+            <SignInIcon />
+          </div>
+          <div className="card-text">
+            <strong>Connect your Yoto account</strong>
+            <p className="muted">
+              Sign in once — after that, cards update automatically. You can
+              also use export-only mode without signing in.
+            </p>
+          </div>
           <button
             className="primary"
-            onClick={() => signIn().then(refresh).catch((e) => alert(e.message))}
+            onClick={() =>
+              signIn()
+                .then(() => setSignedIn(true))
+                .catch((e) => alert(e.message))
+            }
           >
             Sign in to Yoto
           </button>
         </div>
       )}
       {counts.podcasts === 0 && (
-        <div className="card">
-          <strong>Add your first podcast</strong>
-          <p className="muted">Paste an RSS link on the Podcasts screen to get started.</p>
+        <div className="card card--row">
+          <div className="icon-circle icon-circle--secondary">
+            <PlusIcon />
+          </div>
+          <div className="card-text">
+            <strong>Add your first podcast</strong>
+            <p className="muted">Paste an RSS link on the Podcasts screen to get started.</p>
+          </div>
         </div>
       )}
       {counts.attention > 0 && (
@@ -55,9 +70,16 @@ export default function Home() {
           <p className="muted">See Activity for what happened and what to do.</p>
         </div>
       )}
-      <p className="muted">
-        {counts.podcasts} podcast(s) · {counts.jobs} job(s) in progress
-      </p>
+      <div className="row">
+        <div className="stat-tile">
+          <strong>{counts.podcasts}</strong>
+          <span>podcasts</span>
+        </div>
+        <div className="stat-tile">
+          <strong>{counts.jobs}</strong>
+          <span>jobs in progress</span>
+        </div>
+      </div>
     </div>
   );
 }

@@ -3,10 +3,10 @@ import { getDb, now, uuid } from "../lib/db";
 import { fetchFeed, FeedPreview } from "../lib/feeds";
 import { enqueue } from "../lib/jobs";
 import { detectDirection } from "../lib/text";
-import { DEFAULT_RULES } from "../lib/pipeline";
+import { DEFAULT_RULES, removePodcast } from "../lib/pipeline";
 import { DEFAULT_SCAN_INTERVAL_HOURS } from "../config";
 
-export default function Podcasts() {
+export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string) => void }) {
   const [podcasts, setPodcasts] = useState<any[]>([]);
   const [url, setUrl] = useState("");
   const [preview, setPreview] = useState<FeedPreview | null>(null);
@@ -36,13 +36,16 @@ export default function Podcasts() {
     if (!preview) return;
     const d = await getDb();
     const id = uuid();
+    // Deliberately NOT storing preview.etag/lastModified here: the preview
+    // fetch just hit the server, so seeding those would make the very first
+    // scan-feed job get a 304 Not Modified and skip populating episodes
+    // entirely. The real etag/lastModified get set after that first scan.
     await d.execute(
       `INSERT INTO podcasts (id,title,source_type,feed_url,artwork_url,rules_json,
-         scan_interval_hours,etag,last_modified,created_at,updated_at)
-       VALUES ($1,$2,'rss',$3,$4,$5,$6,$7,$8,$9,$9)`,
+         scan_interval_hours,created_at,updated_at)
+       VALUES ($1,$2,'rss',$3,$4,$5,$6,$7,$7)`,
       [id, preview.title, url.trim(), preview.artworkUrl ?? null,
-       JSON.stringify(DEFAULT_RULES), DEFAULT_SCAN_INTERVAL_HOURS,
-       preview.etag ?? null, preview.lastModified ?? null, now()],
+       JSON.stringify(DEFAULT_RULES), DEFAULT_SCAN_INTERVAL_HOURS, now()],
     );
     // Create the linked card record (user links/reorders on the Cards screen).
     await d.execute(
@@ -52,6 +55,19 @@ export default function Podcasts() {
     await enqueue("scan-feed", { podcastId: id });
     setPreview(null);
     setUrl("");
+    await refresh();
+  }
+
+  async function handleRemove(p: any) {
+    if (
+      !confirm(
+        `Remove "${p.title}"? This deletes it and its downloaded episodes from this app. ` +
+          `It does NOT delete the card content already on your Yoto account.`,
+      )
+    ) {
+      return;
+    }
+    await removePodcast(p.id);
     await refresh();
   }
 
@@ -94,9 +110,15 @@ export default function Podcasts() {
             {p.health === "ok" ? "Healthy" : "Needs attention"} · checks every{" "}
             {p.scan_interval_hours}h
           </p>
-          <button onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
-            Check now
-          </button>
+          <div className="row" style={{ marginTop: 10 }}>
+            <button onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
+              Check now
+            </button>
+            <button onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
+            <button className="danger" onClick={() => handleRemove(p)}>
+              Remove
+            </button>
+          </div>
         </div>
       ))}
     </div>

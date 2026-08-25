@@ -17,3 +17,11 @@ export const DEFAULT_MAX_EPISODE_BYTES = 500 * 1024 * 1024;
 export const DEFAULT_KEEP_COUNT = 10;
 export const DEFAULT_SCAN_INTERVAL_HOURS = 6;
 export const ORIGINALS_GRACE_DAYS = 30;
+
+// SPEC.md §5: "MYO limits are enforced by Yoto per card (verify current
+// numbers at build time; historically ~100 tracks / ~500 MB per card)."
+// Yoto doesn't publish an exact number and the app must surface real API
+// errors rather than hard-block on this — it's shown to the user as an
+// approximate guideline only, not enforced.
+export const APPROX_CARD_TRACK_LIMIT = 100;
+export const APPROX_CARD_BYTE_LIMIT = 500 * 1024 * 1024;

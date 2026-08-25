@@ -76,6 +76,7 @@ export type CardTrack = {
   durationSeconds?: number;
   fileSizeBytes?: number;
   format?: string;
+  channels?: number;
 };
 
 /**
@@ -103,6 +104,7 @@ export async function writeCardContent(opts: {
           format: t.format ?? "aac",
           duration: t.durationSeconds,
           fileSize: t.fileSizeBytes,
+          channels: t.channels,
         },
       ],
     };
