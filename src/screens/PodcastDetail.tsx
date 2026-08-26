@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getDb, now } from "../lib/db";
+import { enqueue } from "../lib/jobs";
 import { DEFAULT_RULES, setEpisodeIncluded, Rules } from "../lib/pipeline";
 import { importLocalFiles } from "../lib/localImport";
 import { detectDirection } from "../lib/text";
@@ -54,8 +55,16 @@ export default function PodcastDetail({
     setSourceType(p?.source_type ?? "rss");
     setRules({ ...DEFAULT_RULES, ...JSON.parse(p?.rules_json ?? "{}") });
     setEpisodes(
+      // Position-aware so a manual podcast's drag order (once set) is what
+      // renders and what the move buttons operate on — episodes never
+      // positioned (or podcasts that have never been reordered) fall back
+      // to plain recency, same as before this ordering existed.
       await d.select<any[]>(
-        `SELECT * FROM episodes WHERE podcast_id=$1 ORDER BY published_at DESC`,
+        `SELECT e.* FROM episodes e
+         LEFT JOIN cards c ON c.podcast_id = e.podcast_id
+         LEFT JOIN card_items ci ON ci.card_id = c.id AND ci.episode_id = e.id
+         WHERE e.podcast_id=$1
+         ORDER BY CASE WHEN ci.position IS NULL THEN 1 ELSE 0 END, ci.position, e.published_at DESC`,
         [podcastId],
       ),
     );
@@ -114,6 +123,32 @@ export default function PodcastDetail({
       now(),
     ]);
     setRules(nextRules);
+  }
+
+  // SPEC §17 "drag reorder" — implemented as move buttons rather than literal
+  // drag-and-drop: Tauri v2 captures HTML5 drag events at the webview level
+  // (already relied on above for OS file drops onto this screen), which
+  // would make native in-page `draggable` reordering unreliable here.
+  async function moveEpisode(epId: string, direction: -1 | 1) {
+    const ids = selectedEpisodes.map((e) => e.id);
+    const i = ids.indexOf(epId);
+    const j = i + direction;
+    if (i === -1 || j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    const d = await getDb();
+    const [c] = await d.select<any[]>(`SELECT id FROM cards WHERE podcast_id=$1`, [podcastId]);
+    if (!c) return;
+    // Rewrite every position, not just the swapped pair — the first move on
+    // a podcast with no card_items yet establishes the whole order at once.
+    for (let k = 0; k < ids.length; k++) {
+      await d.execute(
+        `INSERT INTO card_items (card_id, episode_id, position) VALUES ($1,$2,$3)
+         ON CONFLICT(card_id, episode_id) DO UPDATE SET position=excluded.position`,
+        [c.id, ids[k], k],
+      );
+    }
+    await enqueue("sync-card", { cardId: c.id });
+    await refresh();
   }
 
   async function toggle(ep: any) {
@@ -223,6 +258,8 @@ export default function PodcastDetail({
       <div className="episode-list">
         {episodes.map((ep) => {
           const included = SELECTED_STATES.has(ep.state);
+          const canReorder = rules.keepMode === "manual" && included;
+          const selIndex = canReorder ? selectedEpisodes.findIndex((e) => e.id === ep.id) : -1;
           return (
             <div className={"card episode-row" + (included ? "" : " excluded")} key={ep.id}>
               <div className="episode-info">
@@ -233,13 +270,33 @@ export default function PodcastDetail({
                   {STATE_LABEL[ep.state] ?? ep.state}
                 </p>
               </div>
-              <button
-                className={included ? "" : "primary"}
-                disabled={busyId === ep.id}
-                onClick={() => toggle(ep)}
-              >
-                {included ? "Exclude" : "Include"}
-              </button>
+              <div className="row" style={{ gap: 6 }}>
+                {canReorder && (
+                  <>
+                    <button
+                      disabled={selIndex <= 0}
+                      onClick={() => moveEpisode(ep.id, -1)}
+                      aria-label="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      disabled={selIndex === -1 || selIndex >= selectedEpisodes.length - 1}
+                      onClick={() => moveEpisode(ep.id, 1)}
+                      aria-label="Move down"
+                    >
+                      ↓
+                    </button>
+                  </>
+                )}
+                <button
+                  className={included ? "" : "primary"}
+                  disabled={busyId === ep.id}
+                  onClick={() => toggle(ep)}
+                >
+                  {included ? "Exclude" : "Include"}
+                </button>
+              </div>
             </div>
           );
         })}

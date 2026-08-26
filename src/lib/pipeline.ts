@@ -187,20 +187,43 @@ export async function selectDesiredEpisodes(podcastId: string, rules: Rules): Pr
   const d = await getDb();
   // Manual mode: the user's own choices are the whole selection, uncapped —
   // `keep` is only an advisory number shown in the episode picker there.
-  const ready =
-    rules.keepMode === "manual"
-      ? await d.select<any[]>(
-          `SELECT * FROM episodes
-           WHERE podcast_id=$1 AND transcoded_sha256 IS NOT NULL AND state != 'EXCLUDED'
-           ORDER BY published_at DESC`,
-          [podcastId],
-        )
-      : await d.select<any[]>(
-          `SELECT * FROM episodes
-           WHERE podcast_id=$1 AND transcoded_sha256 IS NOT NULL AND state != 'EXCLUDED'
-           ORDER BY published_at DESC LIMIT $2`,
-          [podcastId, rules.keep],
-        );
+  if (rules.keepMode === "manual") {
+    // A custom drag order (SPEC §17 "drag reorder", card_items.position) only
+    // takes over once the user has actually reordered something — otherwise
+    // this stays byte-for-byte the old recency-based query so existing
+    // manual podcasts don't silently reshuffle the first time this runs.
+    const [{ n: hasCustomOrder }] = await d.select<{ n: number }[]>(
+      `SELECT COUNT(*) n FROM card_items ci JOIN cards c ON c.id = ci.card_id
+       WHERE c.podcast_id=$1`,
+      [podcastId],
+    );
+    if (hasCustomOrder) {
+      // Episodes never explicitly positioned (e.g. just included) fall to
+      // the end, most-recent-first among themselves.
+      return d.select<any[]>(
+        `SELECT e.* FROM episodes e
+         LEFT JOIN cards c ON c.podcast_id = e.podcast_id
+         LEFT JOIN card_items ci ON ci.card_id = c.id AND ci.episode_id = e.id
+         WHERE e.podcast_id=$1 AND e.transcoded_sha256 IS NOT NULL AND e.state != 'EXCLUDED'
+         ORDER BY CASE WHEN ci.position IS NULL THEN 1 ELSE 0 END, ci.position, e.published_at DESC`,
+        [podcastId],
+      );
+    }
+    const ready = await d.select<any[]>(
+      `SELECT * FROM episodes
+       WHERE podcast_id=$1 AND transcoded_sha256 IS NOT NULL AND state != 'EXCLUDED'
+       ORDER BY published_at DESC`,
+      [podcastId],
+    );
+    if (rules.order === "oldest-first") ready.reverse();
+    return ready;
+  }
+  const ready = await d.select<any[]>(
+    `SELECT * FROM episodes
+     WHERE podcast_id=$1 AND transcoded_sha256 IS NOT NULL AND state != 'EXCLUDED'
+     ORDER BY published_at DESC LIMIT $2`,
+    [podcastId, rules.keep],
+  );
   if (rules.order === "oldest-first") ready.reverse();
   return ready;
 }
