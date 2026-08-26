@@ -178,12 +178,12 @@ async function uploadEpisodeJob({ episodeId }: { episodeId: string }): Promise<v
   for (const c of cards) await enqueue("sync-card", { cardId: c.id });
 }
 
-/** Selection + hash of what a card's content should be, per its podcast's rules. */
-async function computeDesired(
-  card: any,
-  podcast: any,
-  rules: Rules,
-): Promise<{ tracks: CardTrack[]; desiredHash: string; coverImageUrl?: string }> {
+/**
+ * The episodes a podcast's card should currently contain, in final order,
+ * per its rules. Shared by computeDesired (sync) and exportPodcast (manual
+ * export) so the two can never quietly disagree about "what's on the card."
+ */
+export async function selectDesiredEpisodes(podcastId: string, rules: Rules): Promise<any[]> {
   const d = await getDb();
   // Manual mode: the user's own choices are the whole selection, uncapped —
   // `keep` is only an advisory number shown in the episode picker there.
@@ -193,15 +193,25 @@ async function computeDesired(
           `SELECT * FROM episodes
            WHERE podcast_id=$1 AND transcoded_sha256 IS NOT NULL AND state != 'EXCLUDED'
            ORDER BY published_at DESC`,
-          [podcast.id],
+          [podcastId],
         )
       : await d.select<any[]>(
           `SELECT * FROM episodes
            WHERE podcast_id=$1 AND transcoded_sha256 IS NOT NULL AND state != 'EXCLUDED'
            ORDER BY published_at DESC LIMIT $2`,
-          [podcast.id, rules.keep],
+          [podcastId, rules.keep],
         );
   if (rules.order === "oldest-first") ready.reverse();
+  return ready;
+}
+
+/** Selection + hash of what a card's content should be, per its podcast's rules. */
+async function computeDesired(
+  card: any,
+  podcast: any,
+  rules: Rules,
+): Promise<{ tracks: CardTrack[]; desiredHash: string; coverImageUrl?: string }> {
+  const ready = await selectDesiredEpisodes(podcast.id, rules);
   const tracks: CardTrack[] = ready.map((ep) => ({
     title: ep.title,
     transcodedSha256: ep.transcoded_sha256,

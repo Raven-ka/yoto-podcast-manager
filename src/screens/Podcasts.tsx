@@ -4,6 +4,7 @@ import { fetchFeed, FeedPreview } from "../lib/feeds";
 import { enqueue } from "../lib/jobs";
 import { detectDirection } from "../lib/text";
 import { DEFAULT_RULES, removePodcast } from "../lib/pipeline";
+import { exportPodcast } from "../lib/export";
 import { DEFAULT_SCAN_INTERVAL_HOURS } from "../config";
 
 export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string) => void }) {
@@ -12,6 +13,7 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
   const [preview, setPreview] = useState<FeedPreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportingId, setExportingId] = useState<string | null>(null);
 
   async function refresh() {
     const d = await getDb();
@@ -71,6 +73,17 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
     await refresh();
   }
 
+  async function handleExport(p: any) {
+    setExportingId(p.id);
+    try {
+      await exportPodcast(p.id);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setExportingId(null);
+    }
+  }
+
   return (
     <div>
       <h2>Podcasts</h2>
@@ -122,6 +135,9 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
                 Check now
               </button>
               <button onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
+              <button disabled={exportingId === p.id} onClick={() => handleExport(p)}>
+                {exportingId === p.id ? "Exporting…" : "Export files"}
+              </button>
               <button className="danger" onClick={() => handleRemove(p)}>
                 Remove
               </button>
