@@ -131,6 +131,14 @@ const MIGRATIONS: string[] = [
   ALTER TABLE cards ADD COLUMN cover_media_id TEXT;
   ALTER TABLE cards ADD COLUMN cover_source_url TEXT;
   `,
+  // v5 — SPEC §7 cleanup job: an episode's downloaded original is kept until
+  // it's left every card it was ever on, plus a grace period. NULL means
+  // "currently wanted by some card's desired state"; a timestamp means "first
+  // became unwanted at this time" (not reset by repeated reconciliation —
+  // see reconcileDeselection in pipeline.ts).
+  `
+  ALTER TABLE episodes ADD COLUMN deselected_at TEXT;
+  `,
 ];
 
 export async function getDb(): Promise<Database> {

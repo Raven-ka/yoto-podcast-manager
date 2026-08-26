@@ -12,7 +12,7 @@ import {
   CardTrack,
 } from "./yoto";
 import { enqueue, registerHandler, JobType } from "./jobs";
-import { DEFAULT_KEEP_COUNT } from "../config";
+import { DEFAULT_KEEP_COUNT, ORIGINALS_GRACE_DAYS } from "../config";
 import { remove } from "@tauri-apps/plugin-fs";
 
 // Held off until conflict detection (the write path this shares) was proven
@@ -44,6 +44,10 @@ export function registerAllHandlers(): void {
   registerHandler("download-episode", downloadEpisodeJob);
   registerHandler("upload-episode", uploadEpisodeJob);
   registerHandler("sync-card", syncCard);
+  registerHandler("cleanup", cleanupJob);
+  // Dedupe (enqueue's default) makes this a no-op if a cleanup job is
+  // already scheduled from a previous run — exactly one stays in flight.
+  void enqueue("cleanup", {}, { delaySeconds: 60 });
 }
 
 async function scanFeed({ podcastId }: { podcastId: string }): Promise<void> {
@@ -206,6 +210,10 @@ async function computeDesired(
     channels: ep.transcoded_channels ?? undefined,
     format: ep.transcoded_format ?? undefined,
   }));
+  await reconcileDeselection(
+    podcast.id,
+    new Set(ready.map((ep) => ep.id)),
+  );
   const coverImageUrl = COVER_ART_ENABLED
     ? await ensureCoverImageUrl(card, podcast.artwork_url ?? null)
     : undefined;
@@ -521,17 +529,26 @@ export async function setEpisodeIncluded(episodeId: string, included: boolean): 
   }
 
   if (!included) {
-    await d.execute(`UPDATE episodes SET state='EXCLUDED' WHERE id=$1`, [episodeId]);
+    // COALESCE: don't reset the grace-period clock if it was already
+    // ticking (e.g. excluded, re-included, excluded again).
+    await d.execute(
+      `UPDATE episodes SET state='EXCLUDED', deselected_at=COALESCE(deselected_at, $2) WHERE id=$1`,
+      [episodeId, now()],
+    );
     if (ep.transcoded_sha256) await resyncCards();
     return;
   }
   if (ep.transcoded_sha256) {
-    await d.execute(`UPDATE episodes SET state='DOWNLOADED' WHERE id=$1`, [episodeId]);
+    await d.execute(`UPDATE episodes SET state='DOWNLOADED', deselected_at=NULL WHERE id=$1`, [
+      episodeId,
+    ]);
     await resyncCards();
   } else {
     // Bypass the automatic recency window entirely — an explicit include
     // downloads this episode regardless of where it falls chronologically.
-    await d.execute(`UPDATE episodes SET state='INCLUDED' WHERE id=$1`, [episodeId]);
+    await d.execute(`UPDATE episodes SET state='INCLUDED', deselected_at=NULL WHERE id=$1`, [
+      episodeId,
+    ]);
     await enqueue("download-episode", { episodeId });
   }
 }
@@ -586,6 +603,82 @@ export async function removePodcast(podcastId: string): Promise<void> {
   for (const id of ids) {
     await d.execute(`DELETE FROM jobs WHERE state='PENDING' AND payload_json LIKE $1`, [`%${id}%`]);
   }
+}
+
+/**
+ * Stamp/clear `deselected_at` for a podcast's downloaded episodes against
+ * what's currently wanted (SPEC §7: originals are kept until an episode
+ * leaves every card + a grace period). Only touches episodes with a
+ * downloaded file — nothing else is eligible for cleanup regardless. Only
+ * ever sets the timestamp from NULL (first time it became unwanted); it's
+ * not reset on every reconciliation pass, so the grace period counts from
+ * when it actually left, not from whenever this last happened to run.
+ * Keyed per-podcast, not per-card: today every card sharing a podcast
+ * computes the same desired set from the same rules_json, so this is
+ * correct as-is — it would need to become "wanted by ANY of the podcast's
+ * cards" if per-card rules are ever added.
+ */
+async function reconcileDeselection(podcastId: string, wantedIds: Set<string>): Promise<void> {
+  const d = await getDb();
+  const withFiles = await d.select<{ id: string; deselected_at: string | null }[]>(
+    `SELECT DISTINCT e.id, e.deselected_at FROM episodes e
+     JOIN files f ON f.episode_id = e.id
+     WHERE e.podcast_id = $1`,
+    [podcastId],
+  );
+  for (const ep of withFiles) {
+    const wanted = wantedIds.has(ep.id);
+    if (wanted && ep.deselected_at !== null) {
+      await d.execute(`UPDATE episodes SET deselected_at=NULL WHERE id=$1`, [ep.id]);
+    } else if (!wanted && ep.deselected_at === null) {
+      await d.execute(`UPDATE episodes SET deselected_at=$2 WHERE id=$1`, [ep.id, now()]);
+    }
+  }
+}
+
+/**
+ * SPEC §7: delete downloaded originals once they've been unwanted for
+ * ORIGINALS_GRACE_DAYS. Never touches the Yoto-side transcode — an episode
+ * with `transcoded_sha256` already set can be added back to a card without
+ * re-downloading or re-uploading, since Yoto already has it by that hash.
+ * Self-reschedules daily; this plus enqueue's dedupe (see
+ * registerAllHandlers) is the whole "scheduler," matching SPEC's "no GC
+ * inventory system needed at this scale."
+ */
+async function cleanupJob(): Promise<void> {
+  const d = await getDb();
+  const cutoff = new Date(Date.now() - ORIGINALS_GRACE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  // transcoded_sha256 IS NOT NULL is the actual safety condition, not just
+  // deselected_at: an episode that downloaded but never finished uploading
+  // (failed transcode, stuck NEEDS_ATTENTION) has a files row and would get
+  // stamped unwanted by reconcileDeselection same as anything else, but
+  // Yoto doesn't have its audio yet — deleting that original is unrecoverable
+  // (nothing re-enqueues the download; the next upload attempt would just
+  // throw E_NO_FILE). Only delete once Yoto demonstrably holds the audio by
+  // hash.
+  const files = await d.select<{ id: string; path: string }[]>(
+    `SELECT f.id, f.path FROM files f
+     JOIN episodes e ON e.id = f.episode_id
+     WHERE e.deselected_at IS NOT NULL AND e.deselected_at <= $1
+       AND e.transcoded_sha256 IS NOT NULL`,
+    [cutoff],
+  );
+  for (const f of files) {
+    await remove(f.path).catch(() => {}); // best-effort — a missing file shouldn't block the DB cleanup
+    await d.execute(`DELETE FROM files WHERE id=$1`, [f.id]);
+  }
+  if (files.length) {
+    await logEvent(
+      "cleanup",
+      `Deleted ${files.length} downloaded file(s) past the ${ORIGINALS_GRACE_DAYS}-day grace period after leaving their card(s)`,
+      {},
+    );
+  }
+  // dedupeKey:false — this runs *inside* the still-RUNNING job, so the
+  // default dedupe check (which matches PENDING/RUNNING) would just return
+  // this same job's id and schedule nothing, silently stopping recurrence
+  // after the very first run.
+  await enqueue("cleanup", {}, { delaySeconds: 24 * 60 * 60, dedupeKey: false });
 }
 
 const ACTIVITY_LABEL: Record<JobType, string> = {
