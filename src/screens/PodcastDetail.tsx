@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getDb } from "../lib/db";
 import { DEFAULT_RULES, setEpisodeIncluded, Rules } from "../lib/pipeline";
+import { importLocalFiles } from "../lib/localImport";
 import { detectDirection } from "../lib/text";
 import { APPROX_CARD_TRACK_LIMIT, APPROX_CARD_BYTE_LIMIT } from "../config";
 
@@ -33,17 +35,23 @@ export default function PodcastDetail({
   onBack: () => void;
 }) {
   const [title, setTitle] = useState("");
+  const [sourceType, setSourceType] = useState("rss");
   const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cardConflicted, setCardConflicted] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
 
   async function refresh() {
     const d = await getDb();
-    const [p] = await d.select<any[]>(`SELECT title, rules_json FROM podcasts WHERE id=$1`, [
-      podcastId,
-    ]);
+    const [p] = await d.select<any[]>(
+      `SELECT title, source_type, rules_json FROM podcasts WHERE id=$1`,
+      [podcastId],
+    );
     setTitle(p?.title ?? "");
+    setSourceType(p?.source_type ?? "rss");
     setRules({ ...DEFAULT_RULES, ...JSON.parse(p?.rules_json ?? "{}") });
     setEpisodes(
       await d.select<any[]>(
@@ -63,6 +71,39 @@ export default function PodcastDetail({
     const t = setInterval(refresh, 5000);
     return () => clearInterval(t);
   }, [podcastId]);
+
+  // Webview-level event, not per-DOM-element — safe here because this
+  // screen only ever shows one podcast at a time, so any drop while it's
+  // mounted unambiguously means "add these files to this podcast."
+  useEffect(() => {
+    if (sourceType !== "local") return;
+    let unlisten: (() => void) | undefined;
+    void getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === "drop") {
+          setDragOver(false);
+          setImporting(true);
+          setImportMsg(null);
+          importLocalFiles(podcastId, event.payload.paths)
+            .then(({ added, skipped }) => {
+              setImportMsg(
+                `Added ${added} file(s)` + (skipped ? `, skipped ${skipped}` : "") + ".",
+              );
+              return refresh();
+            })
+            .catch((e: any) => setImportMsg(`Import failed: ${e.message}`))
+            .finally(() => setImporting(false));
+        } else if (event.payload.type === "enter" || event.payload.type === "over") {
+          setDragOver(true);
+        } else {
+          setDragOver(false);
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      });
+    return () => unlisten?.();
+  }, [podcastId, sourceType]);
 
   async function toggle(ep: any) {
     setBusyId(ep.id);
@@ -99,6 +140,17 @@ export default function PodcastDetail({
         Choose which episodes should be uploaded to the card. Excluding an
         episode that's already on the card removes it right away.
       </p>
+
+      {sourceType === "local" && (
+        <div className={"card drop-zone" + (dragOver ? " drop-zone--active" : "")}>
+          <strong>{importing ? "Importing…" : "Drop audio files here"}</strong>
+          <p className="muted">
+            MP3, M4A, AAC, WAV, OGG, FLAC, or Opus. Track titles come from the
+            filename — rename the file first if you want a different title.
+          </p>
+          {importMsg && <p className="muted">{importMsg}</p>}
+        </div>
+      )}
 
       {cardConflicted && (
         <p className="muted error">

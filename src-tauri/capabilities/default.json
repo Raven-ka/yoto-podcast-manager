@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "deep-link:default",
+    "dialog:default",
     "opener:default",
     "opener:allow-open-url",
     "sql:default",

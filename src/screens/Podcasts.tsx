@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
+import { ask, message } from "@tauri-apps/plugin-dialog";
 import { getDb, now, uuid } from "../lib/db";
 import { fetchFeed, FeedPreview } from "../lib/feeds";
 import { enqueue } from "../lib/jobs";
 import { detectDirection } from "../lib/text";
-import { DEFAULT_RULES, removePodcast } from "../lib/pipeline";
+import { DEFAULT_RULES, Rules, removePodcast } from "../lib/pipeline";
 import { exportPodcast } from "../lib/export";
 import { DEFAULT_SCAN_INTERVAL_HOURS } from "../config";
 
@@ -14,6 +15,7 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exportingId, setExportingId] = useState<string | null>(null);
+  const [localTitle, setLocalTitle] = useState("");
 
   async function refresh() {
     const d = await getDb();
@@ -60,15 +62,40 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
     await refresh();
   }
 
+  async function confirmAddLocal() {
+    const title = localTitle.trim();
+    if (!title) return;
+    const d = await getDb();
+    const id = uuid();
+    // No feed = no auto-discovery: every episode is a deliberate drop, so
+    // manual mode (the user's own choices are authoritative) fits local
+    // podcasts better than the RSS default of auto keep-N.
+    const localRules: Rules = { ...DEFAULT_RULES, keepMode: "manual" };
+    await d.execute(
+      `INSERT INTO podcasts (id,title,source_type,rules_json,scan_interval_hours,created_at,updated_at)
+       VALUES ($1,$2,'local',$3,$4,$5,$5)`,
+      [id, title, JSON.stringify(localRules), DEFAULT_SCAN_INTERVAL_HOURS, now()],
+    );
+    await d.execute(`INSERT INTO cards (id, title, podcast_id) VALUES ($1,$2,$3)`, [
+      uuid(),
+      title,
+      id,
+    ]);
+    setLocalTitle("");
+    await refresh();
+  }
+
   async function handleRemove(p: any) {
-    if (
-      !confirm(
-        `Remove "${p.title}"? This deletes it and its downloaded episodes from this app. ` +
-          `It does NOT delete the card content already on your Yoto account.`,
-      )
-    ) {
-      return;
-    }
+    // Native window.confirm() silently no-ops in this webview (returns
+    // false without ever showing a dialog) — @tauri-apps/plugin-dialog's
+    // ask() goes through Tauri's own IPC-driven dialog instead. See
+    // CLAUDE.md: browser-native confirm/alert must not be used here.
+    const confirmed = await ask(
+      `Remove "${p.title}"? This deletes it and its downloaded episodes from this app. ` +
+        `It does NOT delete the card content already on your Yoto account.`,
+      { title: "Remove podcast", kind: "warning" },
+    );
+    if (!confirmed) return;
     await removePodcast(p.id);
     await refresh();
   }
@@ -78,7 +105,7 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
     try {
       await exportPodcast(p.id);
     } catch (e: any) {
-      alert(e.message);
+      await message(e.message, { title: "Export failed", kind: "error" });
     } finally {
       setExportingId(null);
     }
@@ -121,20 +148,45 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
           </div>
         )}
       </div>
+      <div className="card">
+        <strong>Add local files</strong>
+        <p className="muted">
+          No RSS feed — you drag audio files in yourself. Create the podcast
+          here, then open it to drop files onto it.
+        </p>
+        <div className="row" style={{ marginTop: 10 }}>
+          <input
+            type="text"
+            placeholder="Name (e.g. a kid's name, or the story collection)"
+            value={localTitle}
+            onChange={(e) => setLocalTitle(e.target.value)}
+          />
+          <button className="primary" disabled={!localTitle.trim()} onClick={confirmAddLocal}>
+            Create
+          </button>
+        </div>
+      </div>
       {podcasts.map((p) => (
         <div className="card card--row" key={p.id}>
           {p.artwork_url && <img className="artwork" src={p.artwork_url} alt="" />}
           <div className="card-text">
             <strong dir={detectDirection(p.title)}>{p.title}</strong>
             <p className="muted">
-              {p.health === "ok" ? "Healthy" : "Needs attention"} · checks every{" "}
-              {p.scan_interval_hours}h
+              {p.source_type === "local"
+                ? "Local files"
+                : `${p.health === "ok" ? "Healthy" : "Needs attention"} · checks every ${p.scan_interval_hours}h`}
             </p>
             <div className="row" style={{ marginTop: 10 }}>
-              <button onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
-                Check now
-              </button>
-              <button onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
+              {p.source_type === "local" ? (
+                <button onClick={() => onOpenPodcast(p.id)}>Add / manage files</button>
+              ) : (
+                <>
+                  <button onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
+                    Check now
+                  </button>
+                  <button onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
+                </>
+              )}
               <button disabled={exportingId === p.id} onClick={() => handleExport(p)}>
                 {exportingId === p.id ? "Exporting…" : "Export files"}
               </button>

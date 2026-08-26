@@ -147,6 +147,11 @@ input[type="url"], input[type="text"], input[type="number"] {
   color: var(--muted); font-size: 14px;
 }
 .capacity-card { margin-bottom: 20px; }
+.drop-zone {
+  margin-bottom: 20px; text-align: center; border: 2px dashed var(--border);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.drop-zone--active { border-color: var(--accent); background: var(--accent-soft); }
 .progress-bar {
   height: 8px; border-radius: 4px; background: var(--border); overflow: hidden;
 }

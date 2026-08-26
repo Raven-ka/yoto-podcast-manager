@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ask, message } from "@tauri-apps/plugin-dialog";
 import { getDb } from "../lib/db";
 import { enqueue } from "../lib/jobs";
 import { removeCard, resolveConflict } from "../lib/pipeline";
@@ -25,14 +26,12 @@ export default function Cards() {
   }, []);
 
   async function handleRemove(c: any) {
-    if (
-      !confirm(
-        `Remove "${c.title}" from this app? This stops it from being synced here. ` +
-          `It does NOT delete the card content already on your Yoto account.`,
-      )
-    ) {
-      return;
-    }
+    const confirmed = await ask(
+      `Remove "${c.title}" from this app? This stops it from being synced here. ` +
+        `It does NOT delete the card content already on your Yoto account.`,
+      { title: "Remove card", kind: "warning" },
+    );
+    if (!confirmed) return;
     await removeCard(c.id);
     await refresh();
   }
@@ -42,7 +41,7 @@ export default function Cards() {
     try {
       await resolveConflict(c.id, choice);
     } catch (e: any) {
-      alert(e.message);
+      await message(e.message, { title: "Couldn't resolve conflict", kind: "error" });
     } finally {
       await refresh();
       setResolvingId(null);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { appDataDir } from "@tauri-apps/api/path";
+import { message } from "@tauri-apps/plugin-dialog";
 import { isSignedIn, signIn, signOut } from "../lib/oauth";
 
 export default function Settings() {
@@ -27,7 +28,9 @@ export default function Settings() {
           <button
             className="primary"
             onClick={() =>
-              signIn().then(() => setSignedIn(true)).catch((e) => alert(e.message))
+              signIn()
+                .then(() => setSignedIn(true))
+                .catch((e) => message(e.message, { title: "Sign-in failed", kind: "error" }))
             }
           >
             Sign in to Yoto
