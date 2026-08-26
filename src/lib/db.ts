@@ -115,6 +115,22 @@ const MIGRATIONS: string[] = [
   ALTER TABLE episodes ADD COLUMN transcoded_channels INTEGER;
   ALTER TABLE episodes ADD COLUMN transcoded_format TEXT;
   `,
+  // v3 — conflict detection (SPEC.md §5): remember what was actually live on
+  // Yoto after our last write, so a future sync can tell "unchanged since we
+  // wrote it" apart from "someone edited it in the Yoto app." A card with no
+  // baseline yet (every card as of this migration) is treated as "adopt
+  // silently on next check," not as an existing conflict.
+  `
+  ALTER TABLE cards ADD COLUMN confirmed_remote_hash TEXT;
+  ALTER TABLE cards ADD COLUMN pending_desired_hash TEXT;
+  `,
+  // v4 — cache the uploaded cover-image reference per card, keyed by the
+  // podcast artwork URL it came from, so a sync only re-uploads it when that
+  // artwork actually changes.
+  `
+  ALTER TABLE cards ADD COLUMN cover_media_id TEXT;
+  ALTER TABLE cards ADD COLUMN cover_source_url TEXT;
+  `,
 ];
 
 export async function getDb(): Promise<Database> {

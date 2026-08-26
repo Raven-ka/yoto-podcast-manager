@@ -90,8 +90,13 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
         {error && <p className="error">{error}</p>}
         {preview && (
           <div style={{ marginTop: 12 }}>
-            <strong dir={detectDirection(preview.title)}>{preview.title}</strong>
-            <p className="muted">{preview.episodes.length} episodes found. Latest:</p>
+            <div className="card--row">
+              {preview.artworkUrl && <img className="artwork" src={preview.artworkUrl} alt="" />}
+              <div className="card-text">
+                <strong dir={detectDirection(preview.title)}>{preview.title}</strong>
+                <p className="muted">{preview.episodes.length} episodes found. Latest:</p>
+              </div>
+            </div>
             <ul>
               {preview.episodes.slice(0, 5).map((e, i) => (
                 <li key={i} dir={detectDirection(e.title)}>{e.title}</li>
@@ -104,20 +109,23 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
         )}
       </div>
       {podcasts.map((p) => (
-        <div className="card" key={p.id}>
-          <strong dir={detectDirection(p.title)}>{p.title}</strong>
-          <p className="muted">
-            {p.health === "ok" ? "Healthy" : "Needs attention"} · checks every{" "}
-            {p.scan_interval_hours}h
-          </p>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
-              Check now
-            </button>
-            <button onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
-            <button className="danger" onClick={() => handleRemove(p)}>
-              Remove
-            </button>
+        <div className="card card--row" key={p.id}>
+          {p.artwork_url && <img className="artwork" src={p.artwork_url} alt="" />}
+          <div className="card-text">
+            <strong dir={detectDirection(p.title)}>{p.title}</strong>
+            <p className="muted">
+              {p.health === "ok" ? "Healthy" : "Needs attention"} · checks every{" "}
+              {p.scan_interval_hours}h
+            </p>
+            <div className="row" style={{ marginTop: 10 }}>
+              <button onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
+                Check now
+              </button>
+              <button onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
+              <button className="danger" onClick={() => handleRemove(p)}>
+                Remove
+              </button>
+            </div>
           </div>
         </div>
       ))}

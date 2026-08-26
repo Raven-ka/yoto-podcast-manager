@@ -36,6 +36,7 @@ export default function PodcastDetail({
   const [rules, setRules] = useState<Rules>(DEFAULT_RULES);
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [cardConflicted, setCardConflicted] = useState(false);
 
   async function refresh() {
     const d = await getDb();
@@ -50,6 +51,11 @@ export default function PodcastDetail({
         [podcastId],
       ),
     );
+    const [c] = await d.select<any[]>(
+      `SELECT sync_state FROM cards WHERE podcast_id=$1`,
+      [podcastId],
+    );
+    setCardConflicted(c?.sync_state === "CONFLICT");
   }
 
   useEffect(() => {
@@ -93,6 +99,13 @@ export default function PodcastDetail({
         Choose which episodes should be uploaded to the card. Excluding an
         episode that's already on the card removes it right away.
       </p>
+
+      {cardConflicted && (
+        <p className="muted error">
+          This card was changed in the Yoto app and needs your decision before
+          any change here reaches it — resolve it on the Cards screen first.
+        </p>
+      )}
 
       <div className="card capacity-card">
         <div className="row" style={{ justifyContent: "space-between" }}>

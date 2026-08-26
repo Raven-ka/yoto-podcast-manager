@@ -1,5 +1,6 @@
 // Yoto app registration (public client — the ID is not a secret).
-// Registered by Eran, 2026-08-23. Scopes: user:content:manage, user:icons:manage, offline_access.
+// Registered by Eran, 2026-08-23. Scopes: user:content:manage, user:content:view,
+// user:icons:manage, offline_access.
 export const YOTO_CLIENT_ID = "OnSLBpp6bazLuLyxhmt6t5XfmTzL3KXC";
 
 // NOTE: verify these against https://yoto.dev before first run.
@@ -9,8 +10,13 @@ export const YOTO_API_BASE = "https://api.yotoplay.com";
 export const YOTO_AUDIENCE = "https://api.yotoplay.com";
 
 export const OAUTH_CALLBACK = "yotopm://oauth/callback";
+// user:content:view was added 2026-08-25 for conflict detection's
+// GET /content/{cardId} (SPEC §5) — confirmed live via a 403 without it.
+// Anyone signed in before that date needs to sign out/in once to pick it up;
+// their existing token was minted without this scope and won't gain it
+// retroactively.
 export const OAUTH_SCOPES =
-  "user:content:manage user:icons:manage offline_access";
+  "user:content:manage user:content:view user:icons:manage offline_access";
 
 // Downloader defaults (SPEC.md §7). Advanced settings may override per source.
 export const DEFAULT_MAX_EPISODE_BYTES = 500 * 1024 * 1024;

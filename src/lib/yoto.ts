@@ -80,6 +80,27 @@ export type CardTrack = {
 };
 
 /**
+ * Upload a cover image by URL — used to reuse the podcast's own RSS artwork
+ * as the card cover instead of asking the user to supply one separately.
+ * The upload itself is confirmed working live (2026-08-25). Returns the CDN
+ * `mediaUrl` — the `yoto:#<mediaId>` reference (the same scheme tracks use)
+ * was tried first and confirmed live to produce a blank cover in the Yoto
+ * app; `mediaUrl` is the fallback per yoto.dev's response shape.
+ */
+export async function uploadCoverImage(imageUrl: string): Promise<string> {
+  const res = await api(
+    `/media/coverImage/user/me/upload?imageUrl=${encodeURIComponent(imageUrl)}&coverType=myo`,
+    { method: "POST" },
+  );
+  if (!res.ok) throw new Error(`cover upload failed: ${res.status} (E_YOTO_COVER_UPLOAD)`);
+  const json = (await res.json()) as { coverImage?: { mediaUrl?: string } };
+  if (!json.coverImage?.mediaUrl) {
+    throw new Error(`cover upload response missing mediaUrl (E_YOTO_COVER_UPLOAD_SHAPE)`);
+  }
+  return json.coverImage.mediaUrl;
+}
+
+/**
  * Step 4: create or update the playlist/card content object.
  * One chapter per track (podcast-episode model: skip = next episode).
  * Pass `contentId` to update an existing card's content.
@@ -88,6 +109,7 @@ export async function writeCardContent(opts: {
   contentId?: string;
   title: string;
   tracks: CardTrack[];
+  coverImageUrl?: string;
 }): Promise<{ cardId: string }> {
   const chapters = opts.tracks.map((t, i) => {
     const key = String(i + 1).padStart(2, "0");
@@ -118,6 +140,12 @@ export async function writeCardContent(opts: {
         duration: opts.tracks.reduce((s, t) => s + (t.durationSeconds ?? 0), 0),
         fileSize: opts.tracks.reduce((s, t) => s + (t.fileSizeBytes ?? 0), 0),
       },
+      // Shape unverified against the live API (yoto.dev doesn't document
+      // it). `imageL` as a `yoto:#<mediaId>` reference (the same scheme
+      // tracks use) was tried first and confirmed live to render a blank
+      // cover in the Yoto app; this is the second guess (the CDN URL
+      // straight from the upload response).
+      ...(opts.coverImageUrl ? { cover: { imageL: opts.coverImageUrl } } : {}),
     },
   };
   const res = await api(`/content`, {
@@ -130,6 +158,25 @@ export async function writeCardContent(opts: {
   }
   const json = (await res.json()) as { card?: { cardId: string } };
   return { cardId: json.card?.cardId ?? opts.contentId ?? "" };
+}
+
+/**
+ * Fetch a card's current live content (SPEC.md §5 conflict detection).
+ * Returns null if the card no longer exists on Yoto (deleted remotely).
+ */
+export async function getContent(
+  cardId: string,
+): Promise<{ chapters: unknown } | null> {
+  const res = await api(`/content/${cardId}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`get content failed: ${res.status} (E_YOTO_GET_CONTENT)`);
+  const json = (await res.json()) as { card?: { content?: { chapters?: unknown } } };
+  if (json.card?.content?.chapters === undefined) {
+    // Don't default to []: that hashes to a stable value and conflict
+    // detection would read a shape mismatch as "no drift, forever."
+    throw new Error(`get content response missing chapters (E_YOTO_GET_CONTENT_SHAPE)`);
+  }
+  return { chapters: json.card.content.chapters };
 }
 
 /** List the user's MYO content (for the card picker + conflict detection). */

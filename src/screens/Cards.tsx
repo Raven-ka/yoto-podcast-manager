@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { getDb } from "../lib/db";
 import { enqueue } from "../lib/jobs";
-import { removeCard } from "../lib/pipeline";
+import { removeCard, resolveConflict } from "../lib/pipeline";
 import { detectDirection } from "../lib/text";
 
 export default function Cards() {
   const [cards, setCards] = useState<any[]>([]);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   async function refresh() {
     const d = await getDb();
@@ -36,6 +37,18 @@ export default function Cards() {
     await refresh();
   }
 
+  async function handleResolve(c: any, choice: "keep-mine" | "let-app-manage") {
+    setResolvingId(c.id);
+    try {
+      await resolveConflict(c.id, choice);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      await refresh();
+      setResolvingId(null);
+    }
+  }
+
   const stateLabel: Record<string, string> = {
     IN_SYNC: "Up to date",
     OUT_OF_DATE: "Update pending",
@@ -57,12 +70,33 @@ export default function Cards() {
             {stateLabel[c.sync_state] ?? c.sync_state} · {c.on_card} episode(s) on card
             {c.last_synced_at && ` · last updated ${new Date(c.last_synced_at).toLocaleString()}`}
           </p>
-          <div className="row" style={{ marginTop: 10 }}>
-            <button onClick={() => enqueue("sync-card", { cardId: c.id })}>Sync now</button>
-            <button className="danger" onClick={() => handleRemove(c)}>
-              Remove
-            </button>
-          </div>
+          {c.sync_state === "CONFLICT" ? (
+            <>
+              <p className="muted error" style={{ marginTop: 6 }}>
+                Someone changed this card in the Yoto app since this app last updated it.
+                Choose how to proceed.
+              </p>
+              <div className="row" style={{ marginTop: 10 }}>
+                <button disabled={resolvingId === c.id} onClick={() => handleResolve(c, "keep-mine")}>
+                  Keep my Yoto app changes
+                </button>
+                <button
+                  className="primary"
+                  disabled={resolvingId === c.id}
+                  onClick={() => handleResolve(c, "let-app-manage")}
+                >
+                  Let this app manage the card
+                </button>
+              </div>
+            </>
+          ) : (
+            <div className="row" style={{ marginTop: 10 }}>
+              <button onClick={() => enqueue("sync-card", { cardId: c.id })}>Sync now</button>
+              <button className="danger" onClick={() => handleRemove(c)}>
+                Remove
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>

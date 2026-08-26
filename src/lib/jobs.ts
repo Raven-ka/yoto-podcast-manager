@@ -97,6 +97,19 @@ async function tick(): Promise<void> {
             `UPDATE jobs SET state='PENDING', next_run_at=$2, last_error=$3 WHERE id=$1`,
             [job.id, new Date(Date.now() + delay * 1000).toISOString(), String(e?.message ?? e)],
           );
+          // SPEC §14: Activity is the primary observability surface — a job
+          // silently retrying in the background for minutes with nothing
+          // visible anywhere until it either succeeds or exhausts attempts
+          // is exactly the "no idea what's going on" gap this closes.
+          await logEvent(
+            "job-retry",
+            `${job.type} hit an error, retrying (attempt ${attempt}/${job.max_attempts} in ${delay}s): ${e?.message ?? e}`,
+            {
+              entityType: "job",
+              entityId: job.id,
+              supportCode: e?.message?.match(/\(E_[A-Z_]+\)/)?.[0] ?? "(E_UNKNOWN)",
+            },
+          );
         }
       } finally {
         running--;

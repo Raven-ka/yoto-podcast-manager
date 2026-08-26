@@ -60,6 +60,7 @@ h1, h2, h3 { font-family: 'Quicksand', -apple-system, sans-serif; font-weight: 7
   width: 8px; height: 8px; border-radius: 50%; background: var(--accent);
   flex-shrink: 0; animation: status-pulse 1.2s ease-in-out infinite;
 }
+.status-dot--warning { background: var(--danger); }
 @keyframes status-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }
@@ -103,6 +104,10 @@ main h2 { margin: 0 0 6px; font-size: 30px; }
 }
 .icon-circle--accent { background: var(--accent-soft); color: var(--accent); }
 .icon-circle--secondary { background: var(--secondary-soft); color: var(--secondary); }
+.artwork {
+  width: 56px; height: 56px; border-radius: 12px; object-fit: cover;
+  flex-shrink: 0; background: var(--border);
+}
 
 .stat-tile {
   background: var(--card-bg); border-radius: 16px; padding: 14px 22px;
