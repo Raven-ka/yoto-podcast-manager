@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { getDb } from "../lib/db";
+import { getDb, now } from "../lib/db";
 import { DEFAULT_RULES, setEpisodeIncluded, Rules } from "../lib/pipeline";
 import { importLocalFiles } from "../lib/localImport";
 import { detectDirection } from "../lib/text";
@@ -105,6 +105,17 @@ export default function PodcastDetail({
     return () => unlisten?.();
   }, [podcastId, sourceType]);
 
+  async function setAutoUpdate(autoUpdate: boolean) {
+    const d = await getDb();
+    const nextRules: Rules = { ...rules, autoUpdate };
+    await d.execute(`UPDATE podcasts SET rules_json=$2, updated_at=$3 WHERE id=$1`, [
+      podcastId,
+      JSON.stringify(nextRules),
+      now(),
+    ]);
+    setRules(nextRules);
+  }
+
   async function toggle(ep: any) {
     setBusyId(ep.id);
     try {
@@ -158,6 +169,23 @@ export default function PodcastDetail({
           any change here reaches it — resolve it on the Cards screen first.
         </p>
       )}
+
+      <div className="card">
+        <label className="row" style={{ alignItems: "center", gap: 8 }}>
+          <input
+            type="checkbox"
+            checked={!rules.autoUpdate}
+            onChange={(e) => setAutoUpdate(!e.target.checked)}
+          />
+          Ask before updating the card (don't sync automatically)
+        </label>
+        {!rules.autoUpdate && (
+          <p className="muted" style={{ marginTop: 6 }}>
+            Changes here won't reach the card until you hit "Sync now" on the
+            Cards screen.
+          </p>
+        )}
+      </div>
 
       <div className="card capacity-card">
         <div className="row" style={{ justifyContent: "space-between" }}>

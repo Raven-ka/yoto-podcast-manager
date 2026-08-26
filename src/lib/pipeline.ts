@@ -270,7 +270,7 @@ async function ensureCoverImageUrl(card: any, artworkUrl: string | null): Promis
   }
 }
 
-async function syncCard({ cardId }: { cardId: string }): Promise<void> {
+async function syncCard({ cardId, force }: { cardId: string; force?: boolean }): Promise<void> {
   const d = await getDb();
   const [card] = await d.select<any[]>(`SELECT * FROM cards WHERE id=$1`, [cardId]);
   if (!card) return;
@@ -282,6 +282,15 @@ async function syncCard({ cardId }: { cardId: string }): Promise<void> {
   const { tracks, desiredHash, coverImageUrl } = await computeDesired(card, p, rules);
   if (!tracks.length) return;
   if (desiredHash === card.confirmed_hash) return; // nothing changed locally — skip the remote check
+
+  // SPEC §8: "ask me before changing the card" — flag it and stop before
+  // touching the network at all. `force` is set only by an explicit user
+  // action (the "Sync now" button), which is the user granting the
+  // authorization this rule normally withholds.
+  if (!rules.autoUpdate && !force) {
+    await d.execute(`UPDATE cards SET sync_state='OUT_OF_DATE' WHERE id=$1`, [cardId]);
+    return;
+  }
 
   // SPEC §5: never blindly overwrite. Fetch what's actually live and compare
   // it against the baseline we recorded after our own last write; a mismatch

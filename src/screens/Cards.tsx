@@ -90,7 +90,9 @@ export default function Cards() {
             </>
           ) : (
             <div className="row" style={{ marginTop: 10 }}>
-              <button onClick={() => enqueue("sync-card", { cardId: c.id })}>Sync now</button>
+              <button onClick={() => enqueue("sync-card", { cardId: c.id, force: true })}>
+                Sync now
+              </button>
               <button className="danger" onClick={() => handleRemove(c)}>
                 Remove
               </button>

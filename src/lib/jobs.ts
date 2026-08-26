@@ -6,7 +6,7 @@ export type JobType =
   | "scan-feed" // payload: { podcastId }
   | "download-episode" // payload: { episodeId }
   | "upload-episode" // payload: { episodeId }
-  | "sync-card" // payload: { cardId }
+  | "sync-card" // payload: { cardId, force?: bypass "ask before updating" }
   | "cleanup"; // payload: {}
 
 export type JobHandler = (payload: any) => Promise<void>;
