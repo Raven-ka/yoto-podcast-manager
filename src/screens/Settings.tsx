@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { appDataDir } from "@tauri-apps/api/path";
 import { message } from "@tauri-apps/plugin-dialog";
 import { isSignedIn, signIn, signOut } from "../lib/oauth";
+import { catchUpAfterSignIn } from "../lib/pipeline";
 
 export default function Settings() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -29,7 +30,10 @@ export default function Settings() {
             className="primary"
             onClick={() =>
               signIn()
-                .then(() => setSignedIn(true))
+                .then(() => {
+                  setSignedIn(true);
+                  return catchUpAfterSignIn();
+                })
                 .catch((e) => message(e.message, { title: "Sign-in failed", kind: "error" }))
             }
           >

@@ -14,6 +14,7 @@ import {
 import { enqueue, registerHandler, JobType } from "./jobs";
 import { DEFAULT_KEEP_COUNT, ORIGINALS_GRACE_DAYS } from "../config";
 import { remove } from "@tauri-apps/plugin-fs";
+import { isSignedIn } from "./oauth";
 
 // Held off until conflict detection (the write path this shares) was proven
 // live — confirmed 2026-08-25 (a real CONFLICT correctly caught and resolved
@@ -133,7 +134,12 @@ async function downloadEpisodeJob({ episodeId }: { episodeId: string }): Promise
       [uuid(), episodeId, r.path, r.bytes, r.sha256, now()],
     );
     await d.execute(`UPDATE episodes SET state='DOWNLOADED' WHERE id=$1`, [episodeId]);
-    await enqueue("upload-episode", { episodeId });
+    // Export-only mode (SPEC §17): signed out, this episode just stops here
+    // at DOWNLOADED — a real, usable state (exportable) — instead of an
+    // upload job burning 5 retries against no token and landing in Activity
+    // as a failure for work the user never asked for. catchUpAfterSignIn
+    // picks it back up once they do sign in.
+    if (await isSignedIn()) await enqueue("upload-episode", { episodeId });
   } catch (e: any) {
     await d.execute(
       `UPDATE episodes SET state='NEEDS_ATTENTION', error_message=$2 WHERE id=$1`,
@@ -540,6 +546,22 @@ async function hashDesired(tracks: CardTrack[], coverImageUrl: string | null): P
 async function sha256Hex(input: string): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * SPEC §17 export-only mode: episodes downloaded while signed out sit at
+ * DOWNLOADED with no upload job enqueued (see downloadEpisodeJob /
+ * importLocalFiles). Call this right after a successful sign-in to pick
+ * all of them back up — anything with a file on disk but no transcoded
+ * hash yet is, by definition, exactly that backlog.
+ */
+export async function catchUpAfterSignIn(): Promise<void> {
+  const d = await getDb();
+  const rows = await d.select<{ id: string }[]>(
+    `SELECT DISTINCT e.id FROM episodes e JOIN files f ON f.episode_id = e.id
+     WHERE e.transcoded_sha256 IS NULL AND e.state != 'EXCLUDED'`,
+  );
+  for (const r of rows) await enqueue("upload-episode", { episodeId: r.id });
 }
 
 /**

@@ -7,6 +7,7 @@ import { readFile, writeFile, mkdir } from "@tauri-apps/plugin-fs";
 import { appDataDir, join } from "@tauri-apps/api/path";
 import { getDb, now, uuid } from "./db";
 import { enqueue } from "./jobs";
+import { isSignedIn } from "./oauth";
 
 const AUDIO_EXTENSIONS = new Set([".mp3", ".m4a", ".aac", ".wav", ".ogg", ".flac", ".opus"]);
 
@@ -80,7 +81,10 @@ export async function importLocalFiles(
        VALUES ($1,$2,$3,$4,$5,$6)`,
       [uuid(), episodeId, destPath, bytes.length, sha, now()],
     );
-    await enqueue("upload-episode", { episodeId });
+    // Export-only mode: leave it at DOWNLOADED (already exportable) instead
+    // of enqueuing a job that would just fail for lack of a token — see
+    // catchUpAfterSignIn in pipeline.ts.
+    if (await isSignedIn()) await enqueue("upload-episode", { episodeId });
     added++;
   }
 

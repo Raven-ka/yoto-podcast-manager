@@ -38,7 +38,7 @@ export default function StatusBar() {
         : `${active} job(s) queued`;
 
   return (
-    <div className="status-bar">
+    <div className="status-bar" role="status" aria-live="polite">
       {active > 0 && <span className={hasRetry ? "status-dot status-dot--warning" : "status-dot"} />}
       <span dir={detectDirection(label)} className={hasRetry ? "error" : undefined}>
         {label}

@@ -57,7 +57,7 @@ export default function App() {
   return (
     <div className="shell">
       <div className="body">
-        <nav>
+        <nav aria-label="Main">
           <div className="nav-header">
             <div className="nav-logo">
               <LogoMark />
@@ -74,6 +74,7 @@ export default function App() {
               <button
                 key={k}
                 className={k === screen ? "active" : ""}
+                aria-current={k === screen ? "page" : undefined}
                 onClick={() => {
                   setScreen(k);
                   setOpenPodcastId(null);

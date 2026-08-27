@@ -119,6 +119,7 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
         <div className="row" style={{ marginTop: 10 }}>
           <input
             type="url"
+            aria-label="RSS feed link"
             placeholder="Paste an RSS feed link…"
             value={url}
             onChange={(e) => setUrl(e.target.value)}
@@ -157,6 +158,7 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
         <div className="row" style={{ marginTop: 10 }}>
           <input
             type="text"
+            aria-label="Local podcast name"
             placeholder="Name (e.g. a kid's name, or the story collection)"
             value={localTitle}
             onChange={(e) => setLocalTitle(e.target.value)}
