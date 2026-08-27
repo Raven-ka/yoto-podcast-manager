@@ -28,11 +28,18 @@
       "desktop": {
         "schemes": ["yotopm"]
       }
+    },
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJEOTgyNzQyNkE2ODNFNjcKUldSblBtaHFRaWVZdlZqTkl3Y3QzV2l5Y2VZSTJMQ28yQm9EZTJaaU00ekcvakRGRmxiWHNWWnMK",
+      "endpoints": [
+        "https://github.com/erank/yoto-podcast-manager/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {
     "active": true,
     "targets": ["dmg", "app"],
+    "createUpdaterArtifacts": true,
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png"],
     "macOS": {
       "signingIdentity": "Apple Development"

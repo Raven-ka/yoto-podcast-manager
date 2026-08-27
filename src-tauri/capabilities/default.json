@@ -10,6 +10,8 @@
     "opener:default",
     "opener:allow-open-url",
     "sql:default",
+    "updater:default",
+    "process:allow-restart",
     "fs:default",
     {
       "identifier": "fs:allow-read-file",
