@@ -1,0 +1,33 @@
+#!/bin/bash
+# Copy this file to release-env.local.sh (that name is gitignored via the
+# repo's *.local rule — never commit the filled-in version) and fill in the
+# four values below. Then, in the SAME terminal you'll run the build from:
+#
+#   source scripts/release-env.local.sh
+#   npx tauri build
+#
+# Tauri's bundler detects these env vars automatically and both codesigns
+# and notarizes the .dmg — no config file changes needed. This only affects
+# `tauri build`; `tauri build --debug` (what we've used all session for
+# local testing) is untouched and keeps using the "Apple Development"
+# identity in tauri.conf.json.
+
+# The exact string from `security find-identity -v -p codesigning`, e.g.
+# "Developer ID Application: Your Name (ABCDE12345)". You get this identity
+# by creating a "Developer ID Application" certificate — Xcode > Settings >
+# Accounts > select your Apple ID > Manage Certificates > "+" > that option
+# (or via developer.apple.com/account/resources/certificates). It installs
+# straight into your login keychain; nothing to copy/paste for this step.
+export APPLE_SIGNING_IDENTITY="Developer ID Application: CHANGE ME (TEAMID)"
+
+# developer.apple.com/account > Membership details (top right). Also the
+# parenthesized part of the signing identity above.
+export APPLE_TEAM_ID="CHANGE ME"
+
+# The Apple ID you enrolled in the Developer Program with.
+export APPLE_ID="CHANGE ME"
+
+# NOT your Apple ID password. Generate a single-purpose one at
+# appleid.apple.com > Sign-In and Security > App-Specific Passwords.
+# Revoke and regenerate any time from the same page.
+export APPLE_PASSWORD="CHANGE ME"
