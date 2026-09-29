@@ -1,6 +1,6 @@
 [package]
 name = "yoto-podcast-manager"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
 
 [lib]
@@ -22,10 +22,15 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-keyring = { version = "3", features = ["apple-native"] }
+# Each OS backend must be enabled explicitly — without "windows-native",
+# keyring v3 silently falls back to an in-memory store on Windows.
+keyring = { version = "3", features = ["apple-native", "windows-native"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }
 sha2 = "0.10"
 hex = "0.4"
 tokio = { version = "1", features = ["full"] }
 futures-util = "0.3"
 url = "2"
+
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

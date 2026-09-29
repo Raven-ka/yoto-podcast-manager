@@ -1,7 +1,8 @@
-# Yoto Podcast Manager
+# Podcast Manager for Yoto
 
-A desktop app that keeps Yoto MYO cards stocked with fresh podcast episodes.
-See `SPEC.md` for the full specification and `CLAUDE.md` for AI-assistant guidance.
+by Edrion. A desktop app (macOS and Windows) that keeps Yoto MYO cards
+stocked with fresh podcast episodes. Independent app, not made by or
+affiliated with Yoto. See `SPEC.md` for the full specification.
 
 ## Prerequisites (macOS)
 
@@ -30,11 +31,10 @@ npm test
 
 ```
 SPEC.md                  product spec (source of truth)
-CLAUDE.md                guidance + current status for Claude Code
 src/                     React UI + app logic (TypeScript)
   config.ts              Yoto client ID, endpoints, defaults
   lib/db.ts              SQLite schema + migrations
-  lib/oauth.ts           PKCE sign-in, tokens in macOS keychain
+  lib/oauth.ts           PKCE sign-in, tokens in the OS keychain
   lib/yoto.ts            Yoto API client (upload → transcode → card update)
   lib/feeds.ts           RSS/Atom parsing, dedup canonical keys
   lib/jobs.ts            persistent job queue (survives restarts)
@@ -46,8 +46,10 @@ src-tauri/               Rust shell
   src/lib.rs             keychain commands + plugin setup
 ```
 
-## Before the first release build
+## Release builds
 
-- Run `npm run tauri icon assets/icon.png` to generate the full icon set
-  (including the `.icns` macOS needs for bundling).
-- Signing/notarization needs an Apple Developer account (`SPEC.md` §21).
+- **macOS:** fill in `scripts/release-env.local.sh` (copy from
+  `release-env.example.sh`), then
+  `source scripts/release-env.local.sh && npx tauri build`. Produces a signed,
+  notarized `.dmg` in `src-tauri/target/release/bundle/dmg/`.
+- **Windows:** build on a Windows PC, see `docs/building-windows.md`.

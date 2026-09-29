@@ -5,6 +5,8 @@ import { check, Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { isSignedIn, signIn, signOut } from "../lib/oauth";
 import { catchUpAfterSignIn } from "../lib/pipeline";
+import { getVersion } from "@tauri-apps/api/app";
+import { EdrionLockup } from "../components/Brand";
 
 type UpdateStatus =
   | { kind: "checking" }
@@ -19,6 +21,7 @@ type UpdateStatus =
 export default function Settings() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
   const [dataDir, setDataDir] = useState("");
+  const [version, setVersion] = useState("");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ kind: "unknown" });
 
   async function checkForUpdate() {
@@ -45,6 +48,7 @@ export default function Settings() {
   useEffect(() => {
     void isSignedIn().then(setSignedIn);
     void appDataDir().then(setDataDir);
+    void getVersion().then(setVersion);
     // Silent — see UpdateStatus's "unknown" case for why a failed check
     // here must never surface as an error.
     void checkForUpdate();
@@ -110,6 +114,15 @@ export default function Settings() {
         </p>
         <p>
           <code>{dataDir}</code>
+        </p>
+      </div>
+      <div className="card about-card">
+        <EdrionLockup className="about-brand" />
+        <h3>Podcast Manager for Yoto</h3>
+        <p className="muted">
+          Version {version} · © 2026 Edrion
+          <br />
+          An independent app, not made by or affiliated with Yoto.
         </p>
       </div>
     </div>

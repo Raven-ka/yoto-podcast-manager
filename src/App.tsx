@@ -6,6 +6,7 @@ import Cards from "./screens/Cards";
 import Activity from "./screens/Activity";
 import Settings from "./screens/Settings";
 import StatusBar from "./components/StatusBar";
+import { EdrionWordmark } from "./components/Brand";
 import { HomeIcon, PodcastsIcon, CardsIcon, ActivityIcon, SettingsIcon, LogoMark } from "./components/icons";
 import { startRunner } from "./lib/jobs";
 import { registerAllHandlers } from "./lib/pipeline";
@@ -63,9 +64,8 @@ export default function App() {
               <LogoMark />
             </div>
             <span className="nav-title">
-              Podcast
-              <br />
-              Manager
+              Podcast Manager
+              <span className="nav-subtitle">for Yoto</span>
             </span>
           </div>
           {(Object.keys(SCREENS) as ScreenKey[]).map((k) => {
@@ -85,6 +85,10 @@ export default function App() {
               </button>
             );
           })}
+          <div className="nav-footer">
+            <span>by</span>
+            <EdrionWordmark className="nav-brand" />
+          </div>
         </nav>
         <main>
           {openPodcastId ? (

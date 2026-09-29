@@ -1,6 +1,7 @@
 mod downloader;
 
 use keyring::Entry;
+use tauri::Manager;
 
 const SERVICE: &str = "com.erank.yotopodcastmanager";
 
@@ -34,6 +35,16 @@ fn secret_delete(key: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be registered first. On Windows the OAuth redirect
+        // (yotopm://...) launches a second process; this forwards the URL to
+        // the running instance's onOpenUrl (via the "deep-link" feature) and
+        // exits the duplicate. On macOS the OS delivers the URL directly.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.unminimize();
+                let _ = w.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
