@@ -4,3 +4,5 @@ src-tauri/target/
 .DS_Store
 *.local
 *.local.*
+CLAUDE.md
+.claude/
