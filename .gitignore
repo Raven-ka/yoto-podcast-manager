@@ -6,3 +6,4 @@ src-tauri/target/
 *.local.*
 CLAUDE.md
 .claude/
+.superpowers/

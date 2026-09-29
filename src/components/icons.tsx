@@ -84,12 +84,20 @@ export function PlusIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
+// App mark: a playing card with a second card behind it, sending out sound
+// waves. Master artwork (and the source for every app icon size) is
+// assets/icon/app-icon.svg — keep the two in sync.
 export function LogoMark(props: SVGProps<SVGSVGElement>) {
   return (
-    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" {...props}>
-      <circle cx="9" cy="10" r="1.5" fill="#fff" />
-      <circle cx="15" cy="10" r="1.5" fill="#fff" />
-      <path d="M8 15c1.2 1.1 2.6 1.7 4 1.7s2.8-.6 4-1.7" stroke="#fff" strokeWidth={1.75} strokeLinecap="round" />
+    <svg width={42} height={42} viewBox="0 0 100 100" aria-hidden="true" {...props}>
+      <rect width="100" height="100" rx="23" fill="#D63B16" />
+      <rect x="27" y="17" width="34" height="56" rx="8" fill="#FFC93C" transform="rotate(6 44 45)" />
+      <g transform="rotate(-8 38 48)">
+        <rect x="21" y="20" width="34" height="56" rx="8" fill="#fff" />
+        <polygon points="33,39 33,57 47,48" fill="#D63B16" />
+      </g>
+      <path d="M66 38 a13 13 0 0 1 0 22" fill="none" stroke="#fff" strokeWidth={6} strokeLinecap="round" />
+      <path d="M75 30 a24 24 0 0 1 0 38" fill="none" stroke="#fff" strokeWidth={6} strokeLinecap="round" opacity={0.6} />
     </svg>
   );
 }

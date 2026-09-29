@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Podcast Manager for Yoto app mark ("A2": a playing card with a second
+       card behind it, sending out sound waves). Full-bleed tile. -->
+  <rect width="100" height="100" rx="23" fill="#D63B16"/>
+  <rect x="27" y="17" width="34" height="56" rx="8" fill="#FFC93C" transform="rotate(6 44 45)"/>
+  <g transform="rotate(-8 38 48)">
+    <rect x="21" y="20" width="34" height="56" rx="8" fill="#fff"/>
+    <polygon points="33,39 33,57 47,48" fill="#D63B16"/>
+  </g>
+  <path d="M66 38 a13 13 0 0 1 0 22" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round"/>
+  <path d="M75 30 a24 24 0 0 1 0 38" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" opacity=".6"/>
+</svg>

@@ -105,9 +105,8 @@ nav {
 }
 .nav-header { display: flex; align-items: center; gap: 12px; padding: 4px 8px 28px; }
 .nav-logo {
-  width: 42px; height: 42px; border-radius: 50%; background: var(--accent);
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  box-shadow: 0 6px 14px rgba(214, 59, 22, 0.3);
+  width: 42px; height: 42px; flex-shrink: 0; display: flex;
+  border-radius: 10px; box-shadow: 0 6px 14px rgba(214, 59, 22, 0.28);
 }
 .nav-title { font-family: 'Quicksand', sans-serif; font-weight: 700; font-size: 17px; line-height: 1.15; }
 nav button {
