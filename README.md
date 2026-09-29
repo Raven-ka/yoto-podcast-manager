@@ -50,6 +50,7 @@ src-tauri/               Rust shell
 
 - **macOS:** fill in `scripts/release-env.local.sh` (copy from
   `release-env.example.sh`), then
-  `source scripts/release-env.local.sh && npx tauri build`. Produces a signed,
-  notarized `.dmg` in `src-tauri/target/release/bundle/dmg/`.
+  `source scripts/release-env.local.sh && npx tauri build`, then
+  `scripts/notarize-dmg.sh` (Tauri notarizes the app but not the `.dmg`).
+  Output: `src-tauri/target/release/bundle/dmg/`.
 - **Windows:** build on a Windows PC, see `docs/building-windows.md`.
