@@ -4,6 +4,7 @@ import { getDb, now, uuid } from "../lib/db";
 import { fetchFeed, FeedPreview } from "../lib/feeds";
 import { enqueue } from "../lib/jobs";
 import { detectDirection } from "../lib/text";
+import { initialOf, tintFor } from "../lib/palette";
 import { DEFAULT_RULES, Rules, removePodcast } from "../lib/pipeline";
 import { exportPodcast } from "../lib/export";
 import { DEFAULT_SCAN_INTERVAL_HOURS } from "../config";
@@ -112,93 +113,113 @@ export default function Podcasts({ onOpenPodcast }: { onOpenPodcast: (id: string
   }
 
   return (
-    <div>
-      <h2>Podcasts</h2>
-      <div className="card">
-        <strong>Add a podcast</strong>
-        <div className="row" style={{ marginTop: 10 }}>
-          <input
-            type="url"
-            aria-label="RSS feed link"
-            placeholder="Paste an RSS feed link…"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-          />
-          <button className="primary" disabled={!url || busy} onClick={loadPreview}>
-            {busy ? "Checking…" : "Preview"}
-          </button>
+    <div className="page">
+      <header className="page-header">
+        <h2>Podcasts</h2>
+        <p>Add a show by its RSS link, or make your own from audio files.</p>
+      </header>
+      <div className="grid-2">
+        <div className="card">
+          <h3>Add a podcast</h3>
+          <p className="muted">New episodes are picked up automatically.</p>
+          <div className="row">
+            <input
+              type="url"
+              aria-label="RSS feed link"
+              placeholder="Paste an RSS feed link…"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+            <button className="primary" disabled={!url || busy} onClick={loadPreview}>
+              {busy ? "Checking…" : "Preview"}
+            </button>
+          </div>
+          {error && <p className="error">{error}</p>}
         </div>
-        {error && <p className="error">{error}</p>}
-        {preview && (
-          <div style={{ marginTop: 12 }}>
-            <div className="card--row">
-              {preview.artworkUrl && <img className="artwork" src={preview.artworkUrl} alt="" />}
-              <div className="card-text">
-                <strong dir={detectDirection(preview.title)}>{preview.title}</strong>
-                <p className="muted">{preview.episodes.length} episodes found. Latest:</p>
-              </div>
+        <div className="card">
+          <h3>Add local files</h3>
+          <p className="muted">
+            No RSS feed — you drag audio files in yourself. Create the podcast
+            here, then open it to drop files onto it.
+          </p>
+          <div className="row">
+            <input
+              type="text"
+              aria-label="Local podcast name"
+              placeholder="Name (e.g. a kid's name, or the story collection)"
+              value={localTitle}
+              onChange={(e) => setLocalTitle(e.target.value)}
+            />
+            <button className="primary" disabled={!localTitle.trim()} onClick={confirmAddLocal}>
+              Create
+            </button>
+          </div>
+        </div>
+      </div>
+      {preview && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <div className="card--row">
+            {preview.artworkUrl && <img className="artwork artwork--lg" src={preview.artworkUrl} alt="" />}
+            <div className="card-text">
+              <h3 dir={detectDirection(preview.title)}>{preview.title}</h3>
+              <p className="muted">{preview.episodes.length} episodes found. Latest:</p>
+              <ul className="muted">
+                {preview.episodes.slice(0, 5).map((e, i) => (
+                  <li key={i} dir={detectDirection(e.title)}>{e.title}</li>
+                ))}
+              </ul>
             </div>
-            <ul>
-              {preview.episodes.slice(0, 5).map((e, i) => (
-                <li key={i} dir={detectDirection(e.title)}>{e.title}</li>
-              ))}
-            </ul>
+          </div>
+          <div className="row">
             <button className="primary" onClick={confirmAdd}>
               Add “{preview.title}”
             </button>
+            <button onClick={() => setPreview(null)}>Cancel</button>
           </div>
-        )}
-      </div>
-      <div className="card">
-        <strong>Add local files</strong>
-        <p className="muted">
-          No RSS feed — you drag audio files in yourself. Create the podcast
-          here, then open it to drop files onto it.
-        </p>
-        <div className="row" style={{ marginTop: 10 }}>
-          <input
-            type="text"
-            aria-label="Local podcast name"
-            placeholder="Name (e.g. a kid's name, or the story collection)"
-            value={localTitle}
-            onChange={(e) => setLocalTitle(e.target.value)}
-          />
-          <button className="primary" disabled={!localTitle.trim()} onClick={confirmAddLocal}>
-            Create
-          </button>
         </div>
-      </div>
-      {podcasts.map((p) => (
-        <div className="card card--row" key={p.id}>
-          {p.artwork_url && <img className="artwork" src={p.artwork_url} alt="" />}
-          <div className="card-text">
-            <strong dir={detectDirection(p.title)}>{p.title}</strong>
-            <p className="muted">
-              {p.source_type === "local"
-                ? "Local files"
-                : `${p.health === "ok" ? "Healthy" : "Needs attention"} · checks every ${p.scan_interval_hours}h`}
-            </p>
-            <div className="row" style={{ marginTop: 10 }}>
-              {p.source_type === "local" ? (
-                <button onClick={() => onOpenPodcast(p.id)}>Add / manage files</button>
+      )}
+      {podcasts.length > 0 && <h3 className="section-title">Your podcasts</h3>}
+      <div className="tile-grid">
+        {podcasts.map((p) => (
+          <div className={"podcast-tile " + tintFor(p.id)} key={p.id}>
+            <div className="tile-art">
+              {p.artwork_url ? (
+                <img src={p.artwork_url} alt="" />
               ) : (
-                <>
-                  <button onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
-                    Check now
-                  </button>
-                  <button onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
-                </>
+                <span className="art-initial" aria-hidden="true">{initialOf(p.title)}</span>
               )}
-              <button disabled={exportingId === p.id} onClick={() => handleExport(p)}>
-                {exportingId === p.id ? "Exporting…" : "Export files"}
-              </button>
-              <button className="danger" onClick={() => handleRemove(p)}>
-                Remove
-              </button>
+            </div>
+            <div className="tile-body">
+              <strong dir={detectDirection(p.title)}>{p.title}</strong>
+              {p.source_type === "local" ? (
+                <span className="chip chip--plain">Local files</span>
+              ) : (
+                <span className={"chip " + (p.health === "ok" ? "chip--ok" : "chip--bad")}>
+                  {p.health === "ok" ? "Healthy" : "Needs attention"} · every {p.scan_interval_hours}h
+                </span>
+              )}
+              <div className="tile-actions">
+                {p.source_type === "local" ? (
+                  <button className="small" onClick={() => onOpenPodcast(p.id)}>Add / manage files</button>
+                ) : (
+                  <>
+                    <button className="small" onClick={() => onOpenPodcast(p.id)}>Choose episodes</button>
+                    <button className="small" onClick={() => enqueue("scan-feed", { podcastId: p.id })}>
+                      Check now
+                    </button>
+                  </>
+                )}
+                <button className="small" disabled={exportingId === p.id} onClick={() => handleExport(p)}>
+                  {exportingId === p.id ? "Exporting…" : "Export files"}
+                </button>
+                <button className="small danger" onClick={() => handleRemove(p)}>
+                  Remove
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

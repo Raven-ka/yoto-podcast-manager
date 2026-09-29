@@ -3,7 +3,7 @@ import { message } from "@tauri-apps/plugin-dialog";
 import { getDb } from "../lib/db";
 import { isSignedIn, signIn } from "../lib/oauth";
 import { catchUpAfterSignIn } from "../lib/pipeline";
-import { SignInIcon, PlusIcon } from "../components/icons";
+import { PlusIcon } from "../components/icons";
 
 export default function Home() {
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -28,39 +28,53 @@ export default function Home() {
     return () => clearInterval(t);
   }, []);
 
+  function handleSignIn() {
+    signIn()
+      .then(() => {
+        setSignedIn(true);
+        return catchUpAfterSignIn();
+      })
+      .catch((e) => message(e.message, { title: "Sign-in failed", kind: "error" }));
+  }
+
   return (
-    <div>
-      <h2>Home</h2>
-      {signedIn === false && (
-        <div className="card card--row">
-          <div className="icon-circle icon-circle--accent">
-            <SignInIcon />
-          </div>
-          <div className="card-text">
-            <strong>Connect your Yoto account</strong>
-            <p className="muted">
-              Sign in once — after that, cards update automatically. You can
-              also use export-only mode without signing in.
-            </p>
-          </div>
-          <button
-            className="primary"
-            onClick={() =>
-              signIn()
-                .then(() => {
-                  setSignedIn(true);
-                  return catchUpAfterSignIn();
-                })
-                .catch((e) => message(e.message, { title: "Sign-in failed", kind: "error" }))
-            }
-          >
-            Sign in to Yoto
-          </button>
+    <div className="page">
+      <section className="hero">
+        <div className="hero-text">
+          {signedIn === false ? (
+            <>
+              <h2>Connect your Yoto account</h2>
+              <p>
+                Sign in once — after that, cards update automatically. You can
+                also use export-only mode without signing in.
+              </p>
+              <div className="row">
+                <button className="on-accent" onClick={handleSignIn}>
+                  Sign in to Yoto
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>Hi there!</h2>
+              <p>
+                {counts.jobs > 0
+                  ? "Your cards are being updated in the background."
+                  : "Everything's up to date. New episodes land on your cards automatically."}
+              </p>
+            </>
+          )}
+        </div>
+      </section>
+      {counts.attention > 0 && (
+        <div className="card card--attention">
+          <strong>{counts.attention} episode(s) need attention</strong>
+          <p className="muted">See Activity for what happened and what to do.</p>
         </div>
       )}
       {counts.podcasts === 0 && (
         <div className="card card--row">
-          <div className="icon-circle icon-circle--secondary">
+          <div className="icon-circle">
             <PlusIcon />
           </div>
           <div className="card-text">
@@ -69,20 +83,18 @@ export default function Home() {
           </div>
         </div>
       )}
-      {counts.attention > 0 && (
-        <div className="card">
-          <strong className="error">{counts.attention} episode(s) need attention</strong>
-          <p className="muted">See Activity for what happened and what to do.</p>
-        </div>
-      )}
-      <div className="row">
-        <div className="stat-tile">
+      <div className="stat-grid">
+        <div className="stat-tile tint-orange">
           <strong>{counts.podcasts}</strong>
           <span>podcasts</span>
         </div>
-        <div className="stat-tile">
+        <div className="stat-tile tint-sky">
           <strong>{counts.jobs}</strong>
           <span>jobs in progress</span>
+        </div>
+        <div className="stat-tile tint-green">
+          <strong>{counts.attention}</strong>
+          <span>need attention</span>
         </div>
       </div>
     </div>

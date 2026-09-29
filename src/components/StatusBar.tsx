@@ -39,7 +39,11 @@ export default function StatusBar() {
 
   return (
     <div className="status-bar" role="status" aria-live="polite">
-      {active > 0 && <span className={hasRetry ? "status-dot status-dot--warning" : "status-dot"} />}
+      <span
+        className={
+          "status-dot" + (hasRetry ? " status-dot--warning" : active === 0 ? " status-dot--idle" : "")
+        }
+      />
       <span dir={detectDirection(label)} className={hasRetry ? "error" : undefined}>
         {label}
       </span>

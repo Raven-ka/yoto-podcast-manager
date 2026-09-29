@@ -51,12 +51,16 @@ export default function Settings() {
   }, []);
 
   return (
-    <div>
-      <h2>Settings</h2>
+    <div className="page">
+      <header className="page-header">
+        <h2>Settings</h2>
+      </header>
       <div className="card">
-        <strong>Yoto account</strong>
-        <p className="muted">
-          {signedIn ? "Connected." : "Not connected — export-only mode."}
+        <h3>Yoto account</h3>
+        <p>
+          <span className={"chip " + (signedIn ? "chip--ok" : "chip--warn")}>
+            {signedIn ? "Connected" : "Not connected — export-only mode"}
+          </span>
         </p>
         {signedIn ? (
           <button onClick={() => signOut().then(() => setSignedIn(false))}>
@@ -79,7 +83,7 @@ export default function Settings() {
         )}
       </div>
       <div className="card">
-        <strong>Updates</strong>
+        <h3>Updates</h3>
         {updateStatus.kind === "checking" && <p className="muted">Checking…</p>}
         {updateStatus.kind === "unknown" && <p className="muted">No update info available.</p>}
         {updateStatus.kind === "up-to-date" && <p className="muted">You're on the latest version.</p>}
@@ -93,19 +97,19 @@ export default function Settings() {
           </>
         )}
         {(updateStatus.kind === "unknown" || updateStatus.kind === "up-to-date") && (
-          <button onClick={checkForUpdate} style={{ marginTop: 8 }}>
+          <button onClick={checkForUpdate}>
             Check for updates
           </button>
         )}
       </div>
       <div className="card">
-        <strong>Your data</strong>
+        <h3>Your data</h3>
         <p className="muted">
-          Everything (database + downloaded audio) lives in:
-          <br />
+          Everything (database + downloaded audio) lives in this folder —
+          backing up is just copying it.
+        </p>
+        <p>
           <code>{dataDir}</code>
-          <br />
-          Backing up = copying that folder.
         </p>
       </div>
     </div>

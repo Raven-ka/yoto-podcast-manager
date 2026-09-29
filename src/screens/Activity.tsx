@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { getDb } from "../lib/db";
+import { detectDirection } from "../lib/text";
 
 export default function Activity() {
   const [events, setEvents] = useState<any[]>([]);
@@ -17,18 +18,32 @@ export default function Activity() {
   }, []);
 
   return (
-    <div>
-      <h2>Activity</h2>
-      {events.length === 0 && <p className="muted">Nothing yet.</p>}
-      {events.map((e) => (
-        <div className="card" key={e.id}>
-          <span>{e.message}</span>
-          <p className="muted">
-            {new Date(e.at).toLocaleString()}
-            {e.support_code && ` · support code ${e.support_code}`}
-          </p>
+    <div className="page">
+      <header className="page-header">
+        <h2>Activity</h2>
+        <p>What the app has been doing, newest first.</p>
+      </header>
+      {events.length === 0 ? (
+        <div className="empty">
+          <strong>Nothing yet</strong>
+          Syncs, downloads and problems will show up here.
         </div>
-      ))}
+      ) : (
+        <div className="card list-card">
+          {events.map((e) => (
+            <div className="activity-row" key={e.id}>
+              <span className={"activity-dot" + (e.support_code ? " activity-dot--bad" : "")} />
+              <div>
+                <span dir={detectDirection(e.message)}>{e.message}</span>
+                <p className="muted">
+                  {new Date(e.at).toLocaleString()}
+                  {e.support_code && ` · support code ${e.support_code}`}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

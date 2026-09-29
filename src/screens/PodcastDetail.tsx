@@ -5,6 +5,7 @@ import { enqueue } from "../lib/jobs";
 import { DEFAULT_RULES, setEpisodeIncluded, Rules } from "../lib/pipeline";
 import { importLocalFiles } from "../lib/localImport";
 import { detectDirection } from "../lib/text";
+import { initialOf, tintFor } from "../lib/palette";
 import { APPROX_CARD_TRACK_LIMIT, APPROX_CARD_BYTE_LIMIT } from "../config";
 
 const STATE_LABEL: Record<string, string> = {
@@ -41,6 +42,7 @@ export default function PodcastDetail({
   const [episodes, setEpisodes] = useState<any[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [cardConflicted, setCardConflicted] = useState(false);
+  const [artworkUrl, setArtworkUrl] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importMsg, setImportMsg] = useState<string | null>(null);
@@ -48,10 +50,11 @@ export default function PodcastDetail({
   async function refresh() {
     const d = await getDb();
     const [p] = await d.select<any[]>(
-      `SELECT title, source_type, rules_json FROM podcasts WHERE id=$1`,
+      `SELECT title, source_type, rules_json, artwork_url FROM podcasts WHERE id=$1`,
       [podcastId],
     );
     setTitle(p?.title ?? "");
+    setArtworkUrl(p?.artwork_url ?? null);
     setSourceType(p?.source_type ?? "rss");
     setRules({ ...DEFAULT_RULES, ...JSON.parse(p?.rules_json ?? "{}") });
     setEpisodes(
@@ -177,15 +180,28 @@ export default function PodcastDetail({
   const mb = (n: number) => (n / (1024 * 1024)).toFixed(0);
 
   return (
-    <div>
+    <div className="page">
       <button onClick={onBack} className="back-link">
         ← Back to Podcasts
       </button>
-      <h2 dir={detectDirection(title)}>{title}</h2>
-      <p className="muted">
-        Choose which episodes should be uploaded to the card. Excluding an
-        episode that's already on the card removes it right away.
-      </p>
+      <header className={"detail-header " + tintFor(podcastId)}>
+        {artworkUrl ? (
+          <img className="artwork artwork--lg" src={artworkUrl} alt="" />
+        ) : (
+          <div className="artwork artwork--lg tile-art">
+            <span className="art-initial" style={{ fontSize: 44 }} aria-hidden="true">
+              {initialOf(title)}
+            </span>
+          </div>
+        )}
+        <div>
+          <h2 dir={detectDirection(title)}>{title}</h2>
+          <p>
+            Choose which episodes should be uploaded to the card. Excluding an
+            episode that's already on the card removes it right away.
+          </p>
+        </div>
+      </header>
 
       {sourceType === "local" && (
         <div className={"card drop-zone" + (dragOver ? " drop-zone--active" : "")}>
@@ -199,16 +215,17 @@ export default function PodcastDetail({
       )}
 
       {cardConflicted && (
-        <p className="muted error">
+        <p className="notice">
           This card was changed in the Yoto app and needs your decision before
           any change here reaches it — resolve it on the Cards screen first.
         </p>
       )}
 
       <div className="card">
-        <label className="row" style={{ alignItems: "center", gap: 8 }}>
+        <label className="switch-row">
           <input
             type="checkbox"
+            className="switch"
             checked={!rules.autoUpdate}
             onChange={(e) => setAutoUpdate(!e.target.checked)}
           />
@@ -223,7 +240,7 @@ export default function PodcastDetail({
       </div>
 
       <div className="card capacity-card">
-        <div className="row" style={{ justifyContent: "space-between" }}>
+        <div className="row row--between">
           <strong>
             {selected} / ~{APPROX_CARD_TRACK_LIMIT} episodes · ~{mb(totalBytes)} /{" "}
             ~{mb(APPROX_CARD_BYTE_LIMIT)} MB
@@ -255,13 +272,14 @@ export default function PodcastDetail({
         )}
       </div>
 
-      <div className="episode-list">
+      <h3 className="section-title">Episodes</h3>
+      <div className={episodes.length ? "card list-card" : ""}>
         {episodes.map((ep) => {
           const included = SELECTED_STATES.has(ep.state);
           const canReorder = rules.keepMode === "manual" && included;
           const selIndex = canReorder ? selectedEpisodes.findIndex((e) => e.id === ep.id) : -1;
           return (
-            <div className={"card episode-row" + (included ? "" : " excluded")} key={ep.id}>
+            <div className={"episode-row" + (included ? "" : " excluded")} key={ep.id}>
               <div className="episode-info">
                 <strong dir={detectDirection(ep.title)}>{ep.title}</strong>
                 <p className="muted">
@@ -270,10 +288,11 @@ export default function PodcastDetail({
                   {STATE_LABEL[ep.state] ?? ep.state}
                 </p>
               </div>
-              <div className="row" style={{ gap: 6 }}>
+              <div className="row" style={{ gap: 6, flexShrink: 0 }}>
                 {canReorder && (
                   <>
                     <button
+                      className="icon-btn"
                       disabled={selIndex <= 0}
                       onClick={() => moveEpisode(ep.id, -1)}
                       aria-label="Move up"
@@ -281,6 +300,7 @@ export default function PodcastDetail({
                       ↑
                     </button>
                     <button
+                      className="icon-btn"
                       disabled={selIndex === -1 || selIndex >= selectedEpisodes.length - 1}
                       onClick={() => moveEpisode(ep.id, 1)}
                       aria-label="Move down"
@@ -290,7 +310,7 @@ export default function PodcastDetail({
                   </>
                 )}
                 <button
-                  className={included ? "" : "primary"}
+                  className={"small" + (included ? "" : " primary")}
                   disabled={busyId === ep.id}
                   onClick={() => toggle(ep)}
                 >
@@ -300,7 +320,12 @@ export default function PodcastDetail({
             </div>
           );
         })}
-        {episodes.length === 0 && <p className="muted">No episodes discovered yet.</p>}
+        {episodes.length === 0 && (
+          <div className="empty">
+            <strong>No episodes yet</strong>
+            {sourceType === "local" ? "Drop audio files above to add some." : "They'll appear after the next feed check."}
+          </div>
+        )}
       </div>
     </div>
   );
